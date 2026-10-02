@@ -115,7 +115,7 @@ export async function POST(req: NextRequest) {
     const buffer = await pres.write({ outputType: "nodebuffer" });
 
     // Send file as response
-    return new NextResponse(buffer as Buffer, {
+    return new NextResponse(buffer as unknown as BodyInit, {
       status: 200,
       headers: {
         "Content-Type": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
@@ -123,8 +123,9 @@ export async function POST(req: NextRequest) {
       },
     });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Export Error:", error);
-    return NextResponse.json({ error: "Erro ao gerar arquivo PowerPoint." }, { status: 500 });
+    const errorMessage = error instanceof Error ? error.message : "Erro ao gerar arquivo PowerPoint.";
+    return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }

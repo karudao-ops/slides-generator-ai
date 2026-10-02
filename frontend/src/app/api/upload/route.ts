@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import pdfParse from "pdf-parse";
+import { PDFParse } from "pdf-parse";
 import mammoth from "mammoth";
 
 export async function POST(req: NextRequest) {
@@ -20,8 +20,13 @@ export async function POST(req: NextRequest) {
 
     // Text Extraction Logic
     if (fileName.endsWith(".pdf") || mimeType === "application/pdf") {
-      const data = await pdfParse(buffer);
-      extractedText = data.text;
+      const parser = new PDFParse({ data: buffer });
+      try {
+        const data = await parser.getText();
+        extractedText = data.text || "";
+      } finally {
+        await parser.destroy().catch(() => {});
+      }
     } 
     else if (fileName.endsWith(".docx") || mimeType === "application/vnd.openxmlformats-officedocument.wordprocessingml.document") {
       const result = await mammoth.extractRawText({ buffer });
@@ -44,8 +49,9 @@ export async function POST(req: NextRequest) {
       extractedText: extractedText.trim(),
     });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Upload Error:", error);
-    return NextResponse.json({ error: "Erro interno no servidor ao processar o arquivo." }, { status: 500 });
+    const errorMessage = error instanceof Error ? error.message : "Erro interno no servidor ao processar o arquivo.";
+    return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }

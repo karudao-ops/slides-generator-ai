@@ -1,14 +1,24 @@
 "use client";
 
 import { useState } from "react";
-import { Upload, FileText, LayoutTemplate, Download, ChevronRight, Loader2 } from "lucide-react";
+import { Upload, FileText, LayoutTemplate, Download, ChevronRight, Loader2, Sparkles } from "lucide-react";
+
+interface SlideItem {
+  title: string;
+  content?: string;
+  bullets?: string[];
+  imageSearchTerm?: string;
+  speakerNotes?: string;
+}
 
 export default function Home() {
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [file, setFile] = useState<File | null>(null);
   const [theme, setTheme] = useState<string>("modern");
+  const [provider, setProvider] = useState<"auto" | "gemini" | "openai">("auto");
+  const [activeProvider, setActiveProvider] = useState<string>("");
   const [loading, setLoading] = useState(false);
-  const [slides, setSlides] = useState<any[]>([]);
+  const [slides, setSlides] = useState<SlideItem[]>([]);
   const [error, setError] = useState("");
 
   const handleUpload = async () => {
@@ -32,16 +42,21 @@ export default function Home() {
       const aiRes = await fetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: uploadData.extractedText })
+        body: JSON.stringify({
+          text: uploadData.extractedText,
+          provider: provider,
+        }),
       });
       const aiData = await aiRes.json();
       
       if (!aiData.success) throw new Error(aiData.error);
 
       setSlides(aiData.slides);
+      setActiveProvider(aiData.provider || provider);
       setStep(2);
-    } catch (err: any) {
-      setError(err.message || "Ocorreu um erro no processamento.");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Ocorreu um erro no processamento.";
+      setError(msg);
     } finally {
       setLoading(false);
     }
@@ -72,8 +87,9 @@ export default function Home() {
       a.remove();
       
       setStep(3); // Sucesso
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Erro ao exportar apresentação.";
+      setError(msg);
     } finally {
       setLoading(false);
     }
@@ -91,7 +107,7 @@ export default function Home() {
         </header>
 
         {error && (
-          <div className="bg-red-50 border-l-4 border-red-500 p-4 text-red-700">
+          <div className="bg-red-50 border-l-4 border-red-500 p-4 text-red-700 rounded shadow-sm">
             <p>{error}</p>
           </div>
         )}
@@ -111,6 +127,49 @@ export default function Home() {
                 {file ? <span className="font-semibold text-blue-600">{file.name}</span> : "Arraste ou clique para selecionar PDF, DOCX ou TXT"}
               </p>
             </div>
+
+            {/* Provider Selection */}
+            <div className="w-full max-w-md space-y-2">
+              <label className="block text-sm font-semibold text-gray-700 flex items-center gap-2">
+                <Sparkles size={16} className="text-blue-500" /> Provedor de IA:
+              </label>
+              <div className="grid grid-cols-3 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setProvider("auto")}
+                  className={`py-2 px-3 text-sm rounded-lg border font-medium transition ${
+                    provider === "auto"
+                      ? "border-blue-600 bg-blue-50 text-blue-700"
+                      : "border-gray-200 text-gray-600 hover:border-gray-300"
+                  }`}
+                >
+                  Automático
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setProvider("gemini")}
+                  className={`py-2 px-3 text-sm rounded-lg border font-medium transition ${
+                    provider === "gemini"
+                      ? "border-blue-600 bg-blue-50 text-blue-700"
+                      : "border-gray-200 text-gray-600 hover:border-gray-300"
+                  }`}
+                >
+                  Google Gemini
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setProvider("openai")}
+                  className={`py-2 px-3 text-sm rounded-lg border font-medium transition ${
+                    provider === "openai"
+                      ? "border-blue-600 bg-blue-50 text-blue-700"
+                      : "border-gray-200 text-gray-600 hover:border-gray-300"
+                  }`}
+                >
+                  OpenAI
+                </button>
+              </div>
+            </div>
+
             <button 
               onClick={handleUpload}
               disabled={loading || !file}
@@ -125,10 +184,17 @@ export default function Home() {
         {step === 2 && (
           <section className="space-y-6">
             <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-              <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
-                <FileText className="text-blue-500" />
-                Roteiro Sugerido pela IA
-              </h2>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-semibold flex items-center gap-2">
+                  <FileText className="text-blue-500" />
+                  Roteiro Sugerido pela IA
+                </h2>
+                {activeProvider && (
+                  <span className="text-xs font-semibold px-2.5 py-1 bg-blue-100 text-blue-800 rounded-full capitalize">
+                    {activeProvider === "gemini" ? "Google Gemini" : activeProvider === "openai" ? "OpenAI" : activeProvider}
+                  </span>
+                )}
+              </div>
               <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2">
                 {slides.map((slide, idx) => (
                   <div key={idx} className="p-4 border rounded-lg bg-gray-50">
